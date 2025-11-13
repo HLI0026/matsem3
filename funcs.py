@@ -1,79 +1,72 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def get_p2_triang(k, only_p1=False):
-
-    N = k+1
+def get_p2_triang(k):
+    """
+    Generate triangulation for square (-1,1)x(-1,1)
+    using 2x denser grid for P2 elements.
+    """
+    N = 2 * k + 1              # number of nodes per side
     x = np.linspace(-1, 1, N)
     y = np.linspace(-1, 1, N)
     X, Y = np.meshgrid(x, y)
-    V = np.column_stack([X.ravel(), Y.ravel()])
+    V = np.column_stack([X.ravel(), Y.ravel()])  # all grid nodes
 
-    p1_indexes = []
-    p1_coords = []
-    for i in range(k):
-        for j in range(k):
-            d0 = i * N + j
-            d1 = d0 + 1
-            d2 = d0 + (N + 1)
+    elem = []     
+    elem_coords = []  
 
-            h0 = d0
-            h1 = d1 + N 
-            h2 = d2 - 1 
+    for j in range(0, N - 1, 2):      # step of 2 because P1 corners are every other node
+        for i in range(0, N - 1, 2):
+            v00 = j * N + i           # bottom-left
+            v02 = j * N + i + 2       # bottom-right
+            v20 = (j + 2) * N + i     # top-left
+            v22 = (j + 2) * N + i + 2 # top-right
 
-            p1_indexes.append([d0, d1, d2])
-            p1_indexes.append([h0, h1, h2])
+            # mid-edge nodes
+            vmid_bottom = j * N + i + 1          # bottom middle
+            vmid_left   = (j + 1) * N + i        # left middle
+            vmid_right  = (j + 1) * N + i + 2    # right middle
+            vmid_top    = (j + 2) * N + i + 1    # top middle
+            vmid_diag   = (j + 1) * N + i + 1    # center point (diagonal crossing)
 
-            p1_coords.append([V[d0], V[d1], V[d2]])
-            p1_coords.append([V[h0], V[h1], V[h2]])
+            tri1 = [v00, v02, v22,
+                    vmid_bottom, vmid_diag, vmid_right]  # P2 order
+            elem.append(tri1)
+            elem_coords.append(V[tri1])
 
-    if only_p1:
-        return p1_indexes, p1_coords
+            tri2 = [v00, v22, v20,
+                    vmid_diag, vmid_top, vmid_left]
+            elem.append(tri2)
+            elem_coords.append(V[tri2])
 
-    p2_indexes = []
-    p2_coords = []
-    for (i1, i2, i3), (c1, c2, c3) in zip(p1_indexes, p1_coords):
-        mid_1_i = (i2 + i1) 
-        mid_2_i = (i3 + i2) 
-        mid_3_i = (i1 + i3) 
-
-        mid_1_c = (c1 + c2) / 2
-        mid_2_c = (c2 + c3) / 2
-        mid_3_c = (c3 + c1) / 2
-
-        p2_indexes.append([i1 * 2 , mid_1_i, i2 * 2, mid_2_i, i3 * 2, mid_3_i])
-        p2_coords.append([c1, mid_1_c, c2, mid_2_c, c3, mid_3_c])
-
-    return np.array(p2_indexes), np.array(p2_coords)
+    return np.array(elem), np.array(elem_coords), V
 
 def plot_p2_mesh(p2_idx, p2_coords):
-    plt.figure(figsize=(16, 16))
-    corner_points = p2_coords[0]
+    plt.figure(figsize=(8, 8))
+    ax = plt.gca()
     
     for tri_i, tri_c in zip(p2_idx, p2_coords):
-        p1_tri_coords = tri_c[0::2]
-        triangle = plt.Polygon(p1_tri_coords, fill=None, edgecolor='gray', linestyle='-')
-        plt.gca().add_patch(triangle)
-        x, y = tri_c[:, 0], tri_c[:, 1]
-        plt.scatter(x, y, color='black', s=10)
+        corner_coords = tri_c[:3]  # first three nodes are corners
+        triangle = plt.Polygon(corner_coords, fill=None, edgecolor='gray', linestyle='-')
+        ax.add_patch(triangle)
         
-        for i,(x,y) in enumerate(zip(x, y)):
-            plt.text(x, y, tri_i[i], color='green', fontsize=12, ha='right', va='top')
+        x, y = tri_c[:, 0], tri_c[:, 1]
+        ax.scatter(x, y, color='black', s=20)
+        
+        for idx, (xi, yi) in zip(tri_i, tri_c):
+            ax.text(xi, yi, str(idx), color='green', fontsize=10, ha='right', va='top')
+    
+    ax.set_aspect('equal')
+    plt.show()
 
-def print_idx_coords_per_triag(p2_idx, p2_coords,triags_to_print=None):
-    
-    triags_to_print = list(triags_to_print) if triags_to_print is not None else None
-    
-    if triags_to_print is None:
-        triags_to_print = range(len(p2_idx))
+
+def print_idx_coords_per_triag(p2_idx, p2_coords, triags_to_print=None):
+    triags_to_print = list(triags_to_print) if triags_to_print is not None else range(len(p2_idx))
 
     for i, (tri_i, tri_c) in enumerate(zip(p2_idx, p2_coords)):
         if i not in triags_to_print:
             continue
-        print(f"=============Triangle {i}:=============")
-        p1_tri_coords = tri_c[0::2]
-        x, y = tri_c[:, 0], tri_c[:, 1]
-        for j,(x,y) in enumerate(zip(x, y)):
-            print(f"Index: {tri_i[j]}, Coord: ({x:.2f}, {y:.2f})")
-
+        print(f"============= Triangle {i} =============")
+        for idx, coord in zip(tri_i, tri_c):
+            print(f"Index: {idx}, Coord: ({coord[0]:.2f}, {coord[1]:.2f})")
         
